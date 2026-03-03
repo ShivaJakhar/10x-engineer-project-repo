@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 from app.models import (
     Prompt, PromptCreate, PromptUpdate,
@@ -11,7 +11,7 @@ from app.models import (
     get_current_time
 )
 from app.storage import storage
-from app.utils import sort_prompts_by_date, filter_prompts_by_collection, search_prompts
+from app.utils import sort_prompts_by_date, filter_prompts_by_collection, search_prompts, filter_prompts_by_tags
 from app import __version__
 
 app = FastAPI(
@@ -45,13 +45,15 @@ def health_check():
 @app.get("/prompts", response_model=PromptList)
 def list_prompts(
     collection_id: Optional[str] = None,
-    search: Optional[str] = None
+    search: Optional[str] = None,
+    tags: Optional[str] = None
 ):
-    """Retrieve a list of prompts, with optional filtering by collection or search query.
+    """Retrieve a list of prompts, with optional filtering by collection, search query, or tags.
 
     Args:
         collection_id (Optional[str]): The ID of the collection to filter prompts by.
         search (Optional[str]): The search query to filter prompts by matching titles.
+        tags (Optional[str]): Comma-separated tags to filter by (all must match).
 
     Returns:
         PromptList: A list of prompts and the total count.
@@ -61,6 +63,10 @@ def list_prompts(
     
     if collection_id:
         prompts = filter_prompts_by_collection(prompts, collection_id)
+    
+    if tags:
+        tag_list = [t.strip() for t in tags.split(",") if t.strip()]
+        prompts = filter_prompts_by_tags(prompts, tag_list)
     
     if search:
         prompts = search_prompts(prompts, search)
@@ -139,6 +145,7 @@ def update_prompt(prompt_id: str, prompt_data: PromptUpdate):
         content=prompt_data.content,
         description=prompt_data.description,
         collection_id=prompt_data.collection_id,
+        tags=prompt_data.tags,
         created_at=existing.created_at,
         updated_at=get_current_time()
     )
@@ -146,7 +153,7 @@ def update_prompt(prompt_id: str, prompt_data: PromptUpdate):
     return storage.update_prompt(prompt_id, updated_prompt)
 
 @app.patch("/prompts/{prompt_id}", response_model=Prompt)
-def patch_prompt(prompt_id: str, prompt_data: Dict[str, Optional[str]]):
+def patch_prompt(prompt_id: str, prompt_data: Dict):
     """Partially update a prompt with the provided fields.
 
     Args:
@@ -184,6 +191,27 @@ def delete_prompt(prompt_id: str):
     if not storage.delete_prompt(prompt_id):
         raise HTTPException(status_code=404, detail="Prompt not found")
     return None
+
+@app.put("/prompts/{prompt_id}/tags", response_model=Prompt)
+def set_prompt_tags(prompt_id: str, tags: List[str]):
+    """Add or replace tags for a specific prompt.
+
+    Args:
+        prompt_id (str): The unique identifier of the prompt.
+        tags (List[str]): The new list of tags.
+
+    Returns:
+        Prompt: The updated prompt with new tags.
+
+    Raises:
+        HTTPException: 404 if the prompt is not found.
+    """
+    existing = storage.get_prompt(prompt_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+    existing.tags = tags
+    existing.updated_at = get_current_time()
+    return storage.update_prompt(prompt_id, existing)
 
 # ============== Collection Endpoints ==============
 

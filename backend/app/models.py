@@ -31,6 +31,7 @@ class PromptBase(BaseModel):
     content: str = Field(..., min_length=1, description="Content or body of the prompt.")
     description: Optional[str] = Field(None, max_length=500, description="Optional description of the prompt.")
     collection_id: Optional[str] = Field(None, description="Identifier of the collection to which the prompt belongs.")
+    tags: List[str] = Field(default_factory=list, description="Tags associated with the prompt.")
 
 class PromptCreate(PromptBase):
     """Model for creating a new prompt, inherits from PromptBase."""
