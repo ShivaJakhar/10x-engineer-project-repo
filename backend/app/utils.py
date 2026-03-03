@@ -1,6 +1,8 @@
 """Utility functions for PromptLab"""
 
+import re
 from typing import List
+
 from app.models import Prompt
 
 def sort_prompts_by_date(prompts: List[Prompt], descending: bool = True) -> List[Prompt]:
@@ -90,6 +92,4 @@ def extract_variables(content: str) -> List[str]:
     Returns:
         List[str]: A list of variable names found within the content.
     """
-    import re
-    pattern = r'\{\{(\w+)\}\}'
-    return re.findall(pattern, content)
+    return re.findall(r'\{\{(\w+)\}\}', content)
